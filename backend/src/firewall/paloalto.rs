@@ -152,6 +152,7 @@ impl FirewallProvider for PaloAltoClient {
         let rule_name = match service.to_lowercase().as_str() {
             "teamviewer" => &self.rule_teamviewer,
             "internet" => &self.rule_internet,
+            "update_windows" => &self.rule_update_windows,
             _ => &self.rule_anydesk,
         };
 
