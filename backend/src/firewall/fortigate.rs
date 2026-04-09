@@ -106,7 +106,8 @@ impl FortiGateClient {
 #[async_trait]
 impl FirewallProvider for FortiGateClient {
     async fn add_ip_to_policy(&self, ip: &str, service: &str) -> Result<(), String> {
-        if service.to_lowercase() == "internet" {
+        let service_lc = service.to_lowercase();
+        if service_lc == "internet" || service_lc == "update_windows" {
             info!("FortiGate: Skipping operations for service '{}'", service);
             return Ok(());
         }

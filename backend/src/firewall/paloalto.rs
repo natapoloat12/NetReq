@@ -11,6 +11,7 @@ pub struct PaloAltoClient {
     rule_anydesk: String,
     rule_teamviewer: String,
     rule_internet: String,
+    rule_update_windows: String,
     vsys: String,
 }
 
@@ -20,6 +21,7 @@ impl PaloAltoClient {
         let rule_anydesk = env::var("PALOALTO_RULE_Anydesk").expect("PALOALTO_RULE_Anydesk must be set");
         let rule_teamviewer = env::var("PALOALTO_RULE_Teamview").expect("PALOALTO_RULE_Teamview must be set");
         let rule_internet = env::var("PALOALTO_RULE_Internet").expect("PALOALTO_RULE_Internet must be set");
+        let rule_update_windows = env::var("PALOALTO_RULE_UpdateWindows").unwrap_or_else(|_| "T2U-Allow All MS-Update".to_string());
         let vsys = env::var("PALOALTO_VSYS").unwrap_or_else(|_| "vsys1".to_string());
         let verify_ssl = env::var("PALOALTO_VERIFY_SSL").unwrap_or_else(|_| "true".to_string()) == "true";
         
@@ -35,6 +37,7 @@ impl PaloAltoClient {
             rule_anydesk,
             rule_teamviewer,
             rule_internet,
+            rule_update_windows,
             vsys,
         }
     }
