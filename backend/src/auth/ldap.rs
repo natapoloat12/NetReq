@@ -87,12 +87,14 @@ pub async fn authenticate_with_ldap(username: &str, password: &str) -> Result<Ld
     let mut user_email = None;
     let mut fullname = None;
     let mut employee_id = None;
+    let mut is_member_of_required_group = false;
+    let required_group = "G-KCE-IT-SI";
 
     let safe_username = sanitize_ldap_input(clean_username);
     let search_filter = format!("(|(userPrincipalName={})(userPrincipalName={})(sAMAccountName={}))", 
         upn_co_th, upn_local, safe_username);
     
-    let attrs = vec!["mail", "displayName", "employeeID"];
+    let attrs = vec!["mail", "displayName", "employeeID", "memberOf"];
 
     if let Ok(search_res) = ldap.search("DC=kce,DC=co,DC=th", Scope::Subtree, &search_filter, attrs.clone()).await {
         if let Ok((results, _)) = search_res.success() {
@@ -101,11 +103,18 @@ pub async fn authenticate_with_ldap(username: &str, password: &str) -> Result<Ld
                 user_email = entry.attrs.get("mail").and_then(|m| m.get(0).cloned());
                 fullname = entry.attrs.get("displayName").and_then(|m| m.get(0).cloned());
                 employee_id = entry.attrs.get("employeeID").and_then(|m| m.get(0).cloned());
+                
+                if let Some(member_of) = entry.attrs.get("memberOf") {
+                    is_member_of_required_group = member_of.iter().any(|group_dn| {
+                        group_dn.to_uppercase().contains(&format!("CN={},", required_group.to_uppercase())) ||
+                        group_dn.to_uppercase().ends_with(&format!("CN={}", required_group.to_uppercase()))
+                    });
+                }
             }
         }
     }
 
-    if user_email.is_none() {
+    if !is_member_of_required_group {
         if let Ok(search_res) = ldap.search("DC=kce,DC=local", Scope::Subtree, &search_filter, attrs).await {
             if let Ok((results, _)) = search_res.success() {
                 if !results.is_empty() {
@@ -113,9 +122,21 @@ pub async fn authenticate_with_ldap(username: &str, password: &str) -> Result<Ld
                     user_email = entry.attrs.get("mail").and_then(|m| m.get(0).cloned());
                     fullname = entry.attrs.get("displayName").and_then(|m| m.get(0).cloned());
                     employee_id = entry.attrs.get("employeeID").and_then(|m| m.get(0).cloned());
+                    
+                    if let Some(member_of) = entry.attrs.get("memberOf") {
+                        is_member_of_required_group = member_of.iter().any(|group_dn| {
+                            group_dn.to_uppercase().contains(&format!("CN={},", required_group.to_uppercase())) ||
+                            group_dn.to_uppercase().ends_with(&format!("CN={}", required_group.to_uppercase()))
+                        });
+                    }
                 }
             }
         }
+    }
+
+    if !is_member_of_required_group {
+        warn!("LDAP: User {} is not a member of the required group {}", clean_username, required_group);
+        return Err(format!("Access denied: User must be a member of group {}", required_group));
     }
 
     Ok(LdapAuthResult {
