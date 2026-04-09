@@ -1,0 +1,43 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - PORT=5051
+      - COOKIE_SECURE=false
+      - CORS_ORIGIN=http://localhost:5053
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5051/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # We expose the backend for direct testing if needed, though Nginx is preferred
+    ports:
+      - "5052:5051"
+    networks:
+      - anydesk_network
+
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "5053:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/login.html"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - anydesk_network
+
+networks:
+  anydesk_network:
+    driver: bridge
