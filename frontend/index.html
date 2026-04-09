@@ -62,13 +62,19 @@
                 </div>
             </div>
 
-            <div>
-                <label for="ip" class="block text-sm font-semibold text-slate-700 mb-1.5">Your IP Address <span class="text-red-500">*</span></label>
-                <div class="relative">
+            <div id="ipContainer" class="space-y-3">
+                <div class="flex items-center justify-between mb-1.5">
+                    <label class="block text-sm font-semibold text-slate-700">IP Addresses <span class="text-red-500">*</span></label>
+                    <button type="button" id="addIpBtn" class="text-blue-600 hover:text-blue-700 text-xs font-bold flex items-center space-x-1 transition-colors">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Add IP</span>
+                    </button>
+                </div>
+                <div class="ip-row relative group">
                     <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
                         <i class="fas fa-network-wired text-sm"></i>
                     </span>
-                    <input type="text" id="ip" name="ip" required 
+                    <input type="text" name="ip[]" required 
                         placeholder="e.g. 10.10.x.x"
                         class="block w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm transition-all focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:outline-none">
                 </div>

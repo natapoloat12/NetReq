@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:5051/api';
+const BASE_URL = 'http://localhost:5052/api';
 
 async function runTest() {
     console.log("--- Service Test (Internet for Server) ---");
@@ -11,9 +11,10 @@ async function runTest() {
     });
     const cookieHeader = loginRes.headers.get('set-cookie');
 
-    // 2. Request Access for Internet
-    const randomIP = `10.155.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
-    console.log(`\nRequesting Internet access for IP ${randomIP}...`);
+    // 2. Request Access for Multiple IPs
+    const randomIP1 = `10.155.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+    const randomIP2 = `10.155.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+    console.log(`\nRequesting Internet access for IPs ${randomIP1}, ${randomIP2}...`);
     
     const accessRes = await fetch(`${BASE_URL}/access`, {
         method: 'POST',
@@ -22,7 +23,7 @@ async function runTest() {
             'Cookie': cookieHeader
         },
         body: JSON.stringify({
-            ip: randomIP,
+            ips: [randomIP1, randomIP2],
             service: "internet",
             cc_emails: ["sysmon@kce.co.th"]
         })

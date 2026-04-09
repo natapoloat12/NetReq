@@ -3,8 +3,7 @@ use validator::Validate;
 
 #[derive(Debug, Deserialize, Validate, Clone)]
 pub struct AccessRequest {
-    #[validate(ip)]
-    pub ip: String,
+    pub ips: Vec<String>,
     
     pub service: Option<String>, // "anydesk" or "teamviewer"
     pub cc_emails: Option<Vec<String>>,

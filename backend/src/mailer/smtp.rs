@@ -10,7 +10,7 @@ pub struct Mailer;
 impl Mailer {
     pub async fn send_access_notification(
         user_email: &str,
-        ip: &str,
+        ips: &[String],
         service: &str,
         cc_emails: Option<Vec<String>>,
         requester_name: &str,
@@ -63,6 +63,12 @@ impl Mailer {
                 }
             }
 
+            let ips_str = ips.join(", ");
+            let ips_html = ips.iter()
+                .map(|ip| format!("<tr><td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{}</td><td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{}</td><td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{}</td><td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>Granted</td></tr>", requester_name, ip, service))
+                .collect::<Vec<_>>()
+                .join("");
+
             let email_html = format!(
                 "<!DOCTYPE html><html><body style='font-family: sans-serif;'>\
                     <h3>Internet Access Request Notification</h3>\
@@ -74,22 +80,17 @@ impl Mailer {
                             <th style='border: 1px solid #ddd; padding: 8px;'>Service</th>\
                             <th style='border: 1px solid #ddd; padding: 8px;'>Status</th>\
                         </tr>\
-                        <tr>\
-                            <td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{}</td>\
-                            <td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{}</td>\
-                            <td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{}</td>\
-                            <td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>Granted</td>\
-                        </tr>\
+                        {}\
                     </table>\
                     <p style='color: #777; font-size: 0.8em; margin-top: 20px;'>\
                         System: Internet Access Portal\
                     </p>\
                 </body></html>",
-                requester_name, ip, service
+                ips_html
             );
 
             let email = builder
-                .subject(format!("Internet Access Granted: {} ({})", ip, service))
+                .subject(format!("Internet Access Granted: {} ({})", ips_str, service))
                 .header(lettre::message::header::ContentType::TEXT_HTML)
                 .body(email_html)
                 .unwrap();
@@ -114,7 +115,7 @@ impl Mailer {
             };
 
             match mailer.send(email).await {
-                Ok(_) => info!("Access notification email sent for {}", ip),
+                Ok(_) => info!("Access notification email sent for IPs: {}", ips_str),
                 Err(e) => error!("Failed to send access notification: {}", e),
             }
         } else {

@@ -25,20 +25,54 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // 2. Form Submission
+    // 2. Form Submission & Multiple IPs
+    const ipContainer = document.getElementById('ipContainer');
+    const addIpBtn = document.getElementById('addIpBtn');
+
+    addIpBtn.addEventListener('click', () => {
+        const row = document.createElement('div');
+        row.className = 'ip-row relative group mt-3';
+        row.innerHTML = `
+            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                <i class="fas fa-network-wired text-sm"></i>
+            </span>
+            <input type="text" name="ip[]" required 
+                placeholder="e.g. 10.10.x.x"
+                class="block w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm transition-all focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:outline-none">
+            <button type="button" class="remove-ip absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-300 hover:text-red-500 transition-colors">
+                <i class="fas fa-times-circle"></i>
+            </button>
+        `;
+        ipContainer.appendChild(row);
+
+        row.querySelector('.remove-ip').addEventListener('click', () => {
+            row.remove();
+        });
+    });
+
     accessForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
         const service = document.getElementById('service').value;
-        const ip = document.getElementById('ip').value.trim();
+        const ipInputs = document.querySelectorAll('input[name="ip[]"]');
+        const ips = Array.from(ipInputs).map(input => input.value.trim()).filter(ip => ip !== "");
+        
         const cc_emails_str = document.getElementById('cc_emails').value.trim();
         const cc_emails = cc_emails_str ? cc_emails_str.split(',').map(email => email.trim()) : [];
 
-        // Simple validation
+        // Validation
         const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-        if (!ipRegex.test(ip)) {
-            showStatus('Invalid IP address format', 'error');
+        
+        if (ips.length === 0) {
+            showStatus('At least one IP address is required', 'error');
             return;
+        }
+
+        for (const ip of ips) {
+            if (!ipRegex.test(ip)) {
+                showStatus(`Invalid IP address format: ${ip}`, 'error');
+                return;
+            }
         }
 
         submitBtn.disabled = true;
@@ -49,13 +83,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             const response = await fetch('/api/access', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ip, service, cc_emails })
+                body: JSON.stringify({ ips, service, cc_emails })
             });
 
             const result = await response.json();
 
             if (response.ok) {
                 showStatus(result.message || 'Access request received and is being processed in the background.', 'success');
+                // Reset to single IP row
+                const rows = document.querySelectorAll('.ip-row');
+                rows.forEach((row, index) => {
+                    if (index > 0) row.remove();
+                    else row.querySelector('input').value = '';
+                });
                 accessForm.reset();
             } else {
                 showStatus(result.message || 'Failed to grant access', 'error');

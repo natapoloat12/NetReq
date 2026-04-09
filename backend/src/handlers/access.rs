@@ -105,50 +105,75 @@ pub async fn request_access_handler(
         })).into_response();
     }
 
-    info!("Access request from {} for IP {} (service: {:?})", claims.sub, payload.ip, payload.service);
+    if payload.ips.is_empty() {
+        return (StatusCode::BAD_REQUEST, Json(APIResponse {
+            status: "error".to_string(),
+            message: "At least one IP address is required".to_string(),
+        })).into_response();
+    }
+
+    info!("Access request from {} for IPs {:?} (service: {:?})", claims.sub, payload.ips, payload.service);
 
     let service = payload.service.clone().unwrap_or_else(|| "anydesk".to_string());
 
-    // Call firewall provider
-    match state.firewall.add_ip_to_policy(&payload.ip, &service).await {
-        Ok(_) => {
-            // Spawn background task for slow operations (Commit + Email)
-            let state_clone = state.clone();
-            let claims_clone = claims.clone();
-            let payload_clone = payload.clone();
-            let service_clone = service.clone();
+    // Process all IPs
+    let mut success_ips = Vec::new();
+    let mut errors = Vec::new();
 
-            tokio::spawn(async move {
-                // Commit changes
-                if let Err(e) = state_clone.firewall.commit().await {
-                    error!("Firewall commit background task failed: {}", e);
-                }
-
-                // Send email
-                let user_email = claims_clone.email.clone().unwrap_or_else(|| format!("{}@kce.co.th", claims_clone.sub));
-                let requester_name = claims_clone.fullname.clone().unwrap_or(claims_clone.sub.clone());
-                
-                Mailer::send_access_notification(
-                    &user_email,
-                    &payload_clone.ip,
-                    &service_clone,
-                    payload_clone.cc_emails.clone(),
-                    &requester_name
-                ).await;
-            });
-
-            (StatusCode::OK, Json(APIResponse {
-                status: "success".to_string(),
-                message: format!("Access requested for IP {} to service {}. Your request is being processed.", payload.ip, service),
-            })).into_response()
-        }
-        Err(e) => {
-            error!("Firewall operation failed: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(APIResponse {
-                status: "error".to_string(),
-                message: format!("Firewall error: {}", e),
-            })).into_response()
+    for ip in &payload.ips {
+        match state.firewall.add_ip_to_policy(ip, &service).await {
+            Ok(_) => success_ips.push(ip.clone()),
+            Err(e) => {
+                error!("Firewall operation failed for IP {}: {}", ip, e);
+                errors.push(format!("{}: {}", ip, e));
+            }
         }
     }
+
+    if success_ips.is_empty() && !payload.ips.is_empty() {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(APIResponse {
+            status: "error".to_string(),
+            message: format!("All firewall operations failed: {}", errors.join(", ")),
+        })).into_response();
+    }
+
+    // Spawn background task for slow operations (Commit + Email)
+    let state_clone = state.clone();
+    let claims_clone = claims.clone();
+    let payload_clone = payload.clone();
+    let service_clone = service.clone();
+    let success_ips_clone = success_ips.clone();
+
+    tokio::spawn(async move {
+        // Commit changes (only if at least one succeeded)
+        if !success_ips_clone.is_empty() {
+            if let Err(e) = state_clone.firewall.commit().await {
+                error!("Firewall commit background task failed: {}", e);
+            }
+
+            // Send email
+            let user_email = claims_clone.email.clone().unwrap_or_else(|| format!("{}@kce.co.th", claims_clone.sub));
+            let requester_name = claims_clone.fullname.clone().unwrap_or(claims_clone.sub.clone());
+            
+            Mailer::send_access_notification(
+                &user_email,
+                &success_ips_clone,
+                &service_clone,
+                payload_clone.cc_emails.clone(),
+                &requester_name
+            ).await;
+        }
+    });
+
+    let message = if errors.is_empty() {
+        format!("Access requested for {} IP(s) to service {}. Your request is being processed.", success_ips.len(), service)
+    } else {
+        format!("Access requested for {} IP(s) ({} failed) to service {}. Your request is being processed.", success_ips.len(), errors.len(), service)
+    };
+
+    (StatusCode::OK, Json(APIResponse {
+        status: "success".to_string(),
+        message,
+    })).into_response()
 }
 
